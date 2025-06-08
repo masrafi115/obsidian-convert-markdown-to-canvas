@@ -37,7 +37,7 @@ interface CanvasNode {
 
 // Represents a connection between two nodes on the canvas
 interface CanvasEdge {
-	id: string;
+	id:string;
 	fromNode: string;
 	fromSide: 'left' | 'right' | 'top' | 'bottom';
 	toNode: string;
@@ -126,18 +126,35 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 		const parentStack: ParsedNode[] = [];
 		const imageRegex = /!\[\[([^\]]+)\]\]/; // Extracts the image name
 
-		const lines = content.split('\n');
+		// Use split(/\r?\n/) to handle Windows line endings
+		const lines = content.split(/\r?\n/);
+		
+		console.log("--- MD to Canvas: Begin Parsing ---");
 
 		for (const line of lines) {
-			if (line.trim() === '') continue;
+			// FIX: Replace non-breaking spaces (\u00A0) with regular spaces
+			const cleanedLine = line.replace(/\u00A0/g, ' ');
 
-			const indentMatch = line.match(/^\s*/);
+			if (cleanedLine.trim() === '') continue;
+
+			// FIX: Normalize indentation by replacing tabs with 2 spaces to handle both cases
+			const normalizedLine = cleanedLine.replace(/\t/g, '  ');
+
+			const indentMatch = normalizedLine.match(/^\s*/);
 			const indentation = indentMatch ? indentMatch[0].length : 0;
-			const level = Math.floor(indentation / 2); // Assuming 2 spaces per indent level
+			const level = Math.floor(indentation / 2);
 
-			if (level >= maxDepth) continue;
-
-			const text = line.trim().replace(/^-\s*/, ''); // Remove bullet point
+			// --- LOGGING ---
+			console.log(`Line: "${line}"`);
+			console.log(`Indentation: ${indentation}, Level: ${level}, Parent Stack Size: ${parentStack.length}`);
+			
+			if (level >= maxDepth) {
+				console.log("-> Skipping due to max depth.");
+				continue;
+			}
+			
+			// Use the normalized line for text extraction to be consistent
+			const text = normalizedLine.trim().replace(/^-\s*/, '');
 			const imageMatch = text.match(imageRegex);
 
 			const node: ParsedNode = {
@@ -156,17 +173,21 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 			const parent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : undefined;
 
 			if (parent) {
+				console.log(`-> Found parent: "${parent.text}". Adding child: "${text}"`);
 				node.parent = parent;
 				parent.children.push(node);
 			} else {
+				console.log(`-> No parent found. Adding as root node: "${text}"`);
 				rootNodes.push(node);
 			}
 
 			parentStack.push(node);
 		}
-
+		
+		console.log("--- MD to Canvas: Parsing Finished ---");
 		return rootNodes;
 	}
+
 
 	/**
 	 * Calculates the positions of each node and generates the final canvas nodes and edges.
