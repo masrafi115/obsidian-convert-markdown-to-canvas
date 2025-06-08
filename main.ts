@@ -1,85 +1,74 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {
+	App,
+	Editor,
+	MarkdownView,
+	Modal,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	TFile,
+} from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+// Interface for our plugin settings (for future use)
+interface MarkdownToCanvasSettings {
+	defaultLayout: 'horizontal' | 'vertical';
+	defaultDepth: number;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+const DEFAULT_SETTINGS: MarkdownToCanvasSettings = {
+	defaultLayout: 'horizontal',
+	defaultDepth: 3,
+};
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+// Main Plugin Class
+export default class MarkdownToCanvasPlugin extends Plugin {
+	settings: MarkdownToCanvasSettings;
 
 	async onload() {
 		await this.loadSettings();
+		console.log('Markdown to Canvas Plugin loaded.');
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
+		// 1. Add the command palette command
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
+			id: 'convert-note-to-canvas',
+			name: 'Convert note to Canvas',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+				if (view.file) {
+					new ConversionModal(this.app, view.file, (result) => {
+						this.createCanvas(result.fileName, view.file, result.layout, result.depth);
+					}).open();
+				} else {
+					new Notice('Please save the note before converting to a canvas.');
 				}
-			}
+			},
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// 2. Add the context menu item for the file explorer
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file) => {
+				if (file instanceof TFile && file.extension === 'md') {
+					menu.addItem((item) => {
+						item
+							.setTitle('Convert to Canvas')
+							.setIcon('git-fork') // A fitting icon
+							.onClick(async () => {
+								new ConversionModal(this.app, file, (result) => {
+									this.createCanvas(result.fileName, file, result.layout, result.depth);
+								}).open();
+							});
+					});
+				}
+			})
+		);
+		
+		// This adds a settings tab so the user can configure default values.
+		// We'll stub this out for now and can implement it fully later.
+		this.addSettingTab(new MarkdownToCanvasSettingTab(this.app, this));
 	}
 
 	onunload() {
-
+		console.log('Markdown to Canvas Plugin unloaded.');
 	}
 
 	async loadSettings() {
@@ -89,46 +78,170 @@ export default class MyPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+	
+	/**
+	 * The core function to create the canvas file.
+	 * This is a placeholder for the actual conversion logic.
+	 * @param newFileName - The name for the new .canvas file
+	 * @param sourceFile - The source .md file to convert
+	 * @param layout - The layout direction ('horizontal' or 'vertical')
+	 * @param depth - The maximum depth of nodes to create
+	 */
+	async createCanvas(newFileName: string, sourceFile: TFile, layout: string, depth: number) {
+		const newFilePath = `${sourceFile.parent.path}/${newFileName}.canvas`;
+		
+		// Check if file already exists
+        const fileExists = await this.app.vault.adapter.exists(newFilePath);
+        if (fileExists) {
+            new Notice(`Error: File "${newFileName}.canvas" already exists.`);
+            return;
+        }
+
+		// --- PARSING AND CANVAS JSON GENERATION WILL GO HERE ---
+		// For now, we'll create a dummy canvas file.
+		const canvasData = {
+			nodes: [
+				{ id: 'node1', x: 0, y: 0, width: 250, height: 60, type: 'text', text: `Canvas for ${sourceFile.basename}`},
+				{ id: 'node2', x: 0, y: 160, width: 250, height: 60, type: 'text', text: `Layout: ${layout}, Depth: ${depth}`},
+			],
+			edges: [
+				{ id: 'edge1', fromNode: 'node1', fromSide: 'bottom', toNode: 'node2', toSide: 'top' }
+			]
+		};
+
+		try {
+			const newFile = await this.app.vault.create(newFilePath, JSON.stringify(canvasData, null, 2));
+			new Notice(`Canvas "${newFileName}.canvas" created successfully!`);
+
+			// Open the new canvas in a new tab
+			await this.app.workspace.getLeaf(true).openFile(newFile);
+
+		} catch (error) {
+			console.error("Error creating canvas file:", error);
+			new Notice("Failed to create canvas. See console for details.");
+		}
+	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
+// Interface for the data returned by the modal
+interface ConversionModalResult {
+	fileName: string;
+	layout: 'horizontal' | 'vertical';
+	depth: number;
+}
+
+
+// --- The Conversion Modal ---
+class ConversionModal extends Modal {
+	result: ConversionModalResult;
+	onSubmit: (result: ConversionModalResult) => void;
+	sourceFile: TFile;
+	
+	constructor(app: App, sourceFile: TFile, onSubmit: (result: ConversionModalResult) => void) {
 		super(app);
+		this.sourceFile = sourceFile;
+		this.onSubmit = onSubmit;
+		this.result = {
+			fileName: `Canvas - ${sourceFile.basename}`,
+			layout: 'horizontal',
+			depth: 3
+		};
 	}
 
 	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Convert Note to Canvas' });
+
+		// 1. File Name Setting
+		new Setting(contentEl)
+			.setName('New canvas name')
+			.setDesc('The name of the .canvas file to be created.')
+			.addText(text =>
+				text
+					.setPlaceholder('Enter file name')
+					.setValue(this.result.fileName)
+					.onChange(async (value) => {
+						this.result.fileName = value;
+					})
+			);
+			
+		// 2. Layout Direction Setting
+		new Setting(contentEl)
+			.setName('Layout direction')
+			.setDesc('The primary flow direction for the mind map nodes.')
+			.addDropdown(dropdown => {
+				dropdown
+					.addOption('horizontal', 'Horizontal (Left-to-Right)')
+					.addOption('vertical', 'Vertical (Top-to-Down)')
+					.setValue(this.result.layout)
+					.onChange(async (value: 'horizontal' | 'vertical') => {
+						this.result.layout = value;
+					});
+			});
+
+		// 3. Depth Limiter Setting
+		// Note: The dynamic node count is a V1 requirement but requires parsing the file
+		// content, which we will add in the next step. For now, it's a simple input.
+		new Setting(contentEl)
+			.setName('Depth limit')
+			.setDesc('Limit the conversion to a specific number of nested levels (e.g., 3).')
+			.addText(text => { // Using text for now, can be a slider later.
+				text
+					.setValue(this.result.depth.toString())
+					.onChange(async (value) => {
+						const depth = parseInt(value);
+						if (!isNaN(depth) && depth > 0) {
+							this.result.depth = depth;
+						}
+					});
+			});
+
+
+		// 4. Submit Button
+		new Setting(contentEl)
+			.addButton(btn =>
+				btn
+					.setButtonText('Convert')
+					.setCta() // Makes the button more prominent
+					.onClick(() => {
+						this.close();
+						this.onSubmit(this.result);
+					})
+			);
 	}
 
 	onClose() {
-		const {contentEl} = this;
+		let { contentEl } = this;
 		contentEl.empty();
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+// --- Settings Tab --- (Placeholder for future implementation)
+class MarkdownToCanvasSettingTab extends PluginSettingTab {
+	plugin: MarkdownToCanvasPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: MarkdownToCanvasPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		const {containerEl} = this;
-
+		const { containerEl } = this;
 		containerEl.empty();
+		containerEl.createEl('h2', { text: 'Settings for Markdown to Canvas' });
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName('Default Layout')
+			.setDesc('Set the default layout direction for new conversions.')
+			.addDropdown(dropdown => {
+				dropdown
+					.addOption('horizontal', 'Horizontal')
+					.addOption('vertical', 'Vertical')
+					.setValue(this.plugin.settings.defaultLayout)
+					.onChange(async (value: 'horizontal' | 'vertical') => {
+						this.plugin.settings.defaultLayout = value;
+						await this.plugin.saveSettings();
+					});
+			});
 	}
 }

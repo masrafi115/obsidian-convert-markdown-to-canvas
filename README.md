@@ -1,94 +1,83 @@
-# Obsidian Sample Plugin
+# Markdown to Canvas Converter - Obsidian Plugin
+This plugin for Obsidian converts your structured Markdown notes into visual mind maps using the native Canvas feature. It intelligently parses headings and nested bullet-point lists to generate a clear, connected, and easy-to-navigate canvas, helping you visualize your ideas and the structure of your notes.
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+## Features (Version 1.0)
+One-Click Conversion: Initiate the conversion process easily from two places:
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+File Explorer Context Menu: Right-click any .md file and select "Convert to Canvas".
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+Command Palette: With a Markdown note open, use Ctrl/Cmd+P and run the "Convert note to Canvas" command.
 
-## First time developing plugins?
+Customizable Conversion: A pop-up modal gives you full control over the output:
 
-Quick starting guide for new plugin devs:
+File Name: Set a custom name for your new .canvas file, pre-filled with a sensible default.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+Layout Direction: Choose between a Horizontal (Left-to-Right) or Vertical (Top-to-Down) flow for your mind map.
 
-## Releasing new releases
+Depth Limiter: Control the complexity of the output by specifying how many nested levels of your list to convert. This is crucial for maintaining clarity and performance with large notes.
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+Intelligent Structure Parsing:
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+Hierarchy: Nested bullet points in your Markdown are converted into parent-child relationships on the canvas.
 
-## Adding your plugin to the community plugin list
+Card Creation: Each list item becomes an individual card.
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+Connection Creation: Edges (lines) are automatically drawn to connect parent cards to their children.
 
-## How to use
+Image Support: Embedded images (![[image.png]]) are rendered as image cards, maintaining their position within the hierarchy.
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+Seamless Workflow: Once the conversion is complete, the new canvas is automatically opened in a new tab, ready for you to review and edit.
 
-## Manually installing the plugin
+## How to Install
+Go to the Latest Release page (you will need to update this link once you have a GitHub repository).
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+Download the main.js, styles.css (if you add one later), and manifest.json files from the release assets.
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
+In your Obsidian vault, navigate to the plugins folder: YourVault/.obsidian/plugins/.
 
-## Funding URL
+Create a new folder inside plugins named markdown-to-canvas-converter.
 
-You can include funding URLs where people who use your plugin can financially support it.
+Copy the downloaded files (main.js, manifest.json) into the new markdown-to-canvas-converter folder.
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+Restart Obsidian or reload the plugins list.
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+Go to Settings -> Community Plugins, find "Markdown to Canvas Converter", and enable it.
+  
+## Future Development (V2.0+)
+Heading-based Grouping: Convert Markdown headings (#, ##, etc.) into labeled groups on the canvas.
 
-If you have multiple URLs, you can also do:
+Dynamic Card Sizing: Automatically adjust card dimensions to fit their text content.
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+Note Conversion: An option to convert list items into new, separate .md notes instead of just text cards.
 
-## API Documentation
+Configuration Defaults: A dedicated settings tab to set your preferred default conversion options.
 
-See https://github.com/obsidianmd/obsidian-api
+Link Handling: Control whether Markdown links are treated as plain text or become active, clickable URLs.
+
+## For Developers (Building from Source)
+If you want to build the plugin from the source code, follow these steps:
+
+Clone the Repository:
+
+git clone https://github.com/your-username/your-repo-name.git
+cd obsidian-markdown-to-canvas
+
+(You will need to update this URL with your actual repository link.)
+
+Install Dependencies:
+Make sure you have Node.js and npm installed.
+
+npm install
+
+Build the Plugin:
+
+For development (this will watch for file changes and automatically re-build):
+
+npm run dev
+
+For a one-time production build:
+
+npm run build
+
+Install in Obsidian:
+After building, copy the generated main.js and manifest.json files into your Obsidian vault's plugin folder (YourVault/.obsidian/plugins/markdown-to-canvas-converter/).
