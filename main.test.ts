@@ -54,8 +54,6 @@ describe('MarkdownToCanvasPlugin: parseMarkdown', () => {
 
     // Reset mocks and plugin instance before each test
     beforeEach(() => {
-        // We can now instantiate the plugin because 'obsidian' is mocked.
-        // We pass 'as any' to satisfy the constructor's type requirements.
         plugin = new MarkdownToCanvasPlugin({} as any, {} as any); 
         mockIdCounter = 0;
     });
@@ -64,7 +62,6 @@ describe('MarkdownToCanvasPlugin: parseMarkdown', () => {
         const markdown = `
         
         `;
-        // We cast to 'any' to access the private method for unit testing
         const result = (plugin as any).parseMarkdown(markdown, 10);
         expect(result).toEqual([]);
     });
@@ -154,26 +151,63 @@ describe('MarkdownToCanvasPlugin: parseMarkdown', () => {
         expect(stripParent(result)).toEqual(expected);
     });
 
-    describe('Bug Replication Tests', () => {
-        test('Test 9 (BUG): Should FAIL to handle siblings with large indentation', () => {
-            // This markdown uses 4-space indentation, which the current logic handles incorrectly.
-            // It makes "Notable Acquisitions" a child of "Motivation", instead of a sibling.
-            const buggyMarkdown = `- Root\n    - Motivation for the Discussion\n    - Notable Acquisitions`;
+    test('Test 9: Should handle siblings with large indentation', () => {
+        const markdown = `- Root\n    - Motivation for the Discussion\n    - Notable Acquisitions`;
+        // FIX: The expected level is now 1, because the dynamic logic sees 4 spaces as the base indent unit.
+        const expectedCorrectStructure = [
+            {
+                id: getMockId(0), text: 'Root', isImage: false, level: 0, children: [
+                    { id: getMockId(1), text: 'Motivation for the Discussion', isImage: false, level: 1, children: [] },
+                    { id: getMockId(2), text: 'Notable Acquisitions', isImage: false, level: 1, children: [] }
+                ]
+            }
+        ];
+        const result = (plugin as any).parseMarkdown(markdown, 10);
+        expect(stripParent(result)).toEqual(expectedCorrectStructure);
+    });
 
-            // This is the CORRECT structure we expect. The test against the buggy code should fail.
-            const expectedCorrectStructure = [
-                {
-                    id: getMockId(0), text: 'Root', isImage: false, level: 0, children: [
-                        { id: getMockId(1), text: 'Motivation for the Discussion', isImage: false, level: 2, children: [] },
-                        { id: getMockId(2), text: 'Notable Acquisitions', isImage: false, level: 2, children: [] }
-                    ]
-                }
-            ];
+    test('Test 10: Should correctly handle complex sibling structures from user file', () => {
+        // This test uses 4-space indents, which the dynamic logic will treat as level 1, 2, etc.
+        const markdown = `
+- Notable Acquisitions
+    - Databricks:
+        - Redash
+        - MosaicML:
+    - Snowflake:
+        - Streamlit:
+        `;
+        
+        const expected = [
+            {
+                id: getMockId(0),
+                text: 'Notable Acquisitions',
+                isImage: false,
+                level: 0,
+                children: [
+                    {
+                        id: getMockId(1),
+                        text: 'Databricks:',
+                        isImage: false,
+                        level: 1, // 4 spaces = level 1
+                        children: [
+                            { id: getMockId(2), text: 'Redash', isImage: false, level: 2, children: [] }, // 8 spaces = level 2
+                            { id: getMockId(3), text: 'MosaicML:', isImage: false, level: 2, children: [] }
+                        ]
+                    },
+                    {
+                        id: getMockId(4),
+                        text: 'Snowflake:',
+                        isImage: false,
+                        level: 1, // 4 spaces = level 1
+                        children: [
+                             { id: getMockId(5), text: 'Streamlit:', isImage: false, level: 2, children: [] } // 8 spaces = level 2
+                        ]
+                    }
+                ]
+            }
+        ];
 
-            const result = (plugin as any).parseMarkdown(buggyMarkdown, 10);
-
-            // This assertion is expected to FAIL with the current buggy code.
-            expect(stripParent(result)).toEqual(expectedCorrectStructure);
-        });
+        const result = (plugin as any).parseMarkdown(markdown, 10);
+        expect(stripParent(result)).toEqual(expected);
     });
 });

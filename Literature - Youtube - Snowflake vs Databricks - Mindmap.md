@@ -1,0 +1,91 @@
+Here is a mind map of the key topics discussed in the provided sources:
+
+- **Snowflake vs. Databricks: A Deep Dive**
+    - **Motivation for the Discussion**
+        - To have an **honest conversation** about the two platforms.
+        - Share perspectives from people who have worked with both platforms and customers using them.
+        - Address common questions and provide insights on where each platform **shines, is weaker, and where they are headed**.
+        - Combat **biased marketing material** from either platform.
+        - Speakers' personal opinions and **inherent biases** disclosed (e.g., Ian's affinity for Snowflake, past negative Spark experience; Jeff's focus on Databricks).
+        - Serve as **inputs for decision-making**, but **do your own research**.
+    - **Speakers' Background**
+        - **Ian**
+            - Co-founder of **Select** (Snowflake cost and optimization management platform).
+            - Works with **Snowflake all day**; product built on Snowflake.
+            - Briefly used Databricks at Capital One.
+            - Worked at Shopify, used **Spark extensively (not Databricks)**, and dealt with tuning partitions and out-of-memory errors (influencing his views on Spark).
+        - **Jeff**
+            - Background in the **academic world** (PhD from Berkeley, MIT).
+            - Adjacent to the original **Spark developers at Berkeley**.
+            - Co-founder of **Sync**, which focuses on working with **Databricks customers**.
+            - Strength is on the **computing side**, intersection of software and hardware.
+    - **Company Origin Stories & Evolution**
+        - Companies started **"scarily close"** to each other, both launching in **2014**.
+        - **Early Partnership**: Databricks and Snowflake initially referred customers to each other (Databricks for ML, Snowflake for data warehousing). **"Definitely not a thing anymore"**.
+        - **Snowflake's Origin**
+            - Founded by **database/data warehousing experts** from Oracle and another database company.
+            - Initial strength: **data warehousing product** (now "Data Cloud").
+            - Early emphasis on **data sharing solution** (first to launch) and **data marketplace** (people selling datasets).
+            - Huge growth fueled by **AWS partnership** and being a better alternative to Redshift.
+            - Later push into **ML/AI workloads with Snowpark** (started as Pythonic wrapper for SQL, now for Python/ML/etc.).
+        - **Databricks' Origin**
+            - Spun out by **academics** (Spark founders).
+            - Started as a **managed Spark service** for large-scale computing, machine learning, and data science workloads.
+            - **Azure partnership** in 2017 (first-party service on Azure) was a big deal for enterprise success.
+            - Early focus on **ML workloads**.
+                - Launched **Managed MLflow** in 2019 (MLflow created by Databricks, helps track ML experiments).
+                - Launched **Model Serving** in 2020 (hosting ML models as API endpoints).
+            - Later launched **Databricks SQL** (2021) and **Serverless SQL** (pure SQL interface for data warehousing), **encroaching on Snowflake's territory**.
+            - Today, **both platforms are converging** and "very much trying to be the all-in-one data platforms".
+    - **Core Use Cases and Key Features (Comparison)**
+        - **Data Ingestion**
+            - **Snowflake:** Historically, data loaded into Snowflake's managed storage. Now supporting **Iceberg format** to directly query data in cloud storage (like Databricks' model).
+            - **Databricks:** Data typically stays in customer's S3 bucket and is moved to cluster memory by Spark. Expanding into managed storage ("volumes").
+        - **Data Transformation**
+            - **Snowflake:** Predominantly **SQL-based pipelines**, relies on third-party tools like DBT, Fivetran. **Partnership ecosystem approach**.
+            - **Databricks:** Vision is a **"One-stop shop"**; offers internal workflows (alternative to Airflow). Acquired companies like Archon (Fivetran competitor) to offer first-party ingestion. Supports pure SQL pipelines with SQL warehouses.
+        - **Analysis & Reporting**
+            - **Snowflake:** Offers Snowsight dashboards and **Streamlit** (for building data apps in Python). Most customers use **external BI tools** (Sigma, Tableau, Looker, PowerBI, Hex).
+            - **Databricks:** Acquired **Redash** (2020) and built a "pretty good" first-party dashboarding tool. Some companies use only Databricks for BI. Also connects to external BI tools.
+        - **Machine Learning / AI**
+            - **Databricks:** Currently has a **stronger, more mature ML offering** and is a "clear winner there today" if ML is the biggest use case. Python-centric.
+            - **Snowflake:** Making a **"huge push"** with Snowpark (Python notebooks, access to Anaconda distribution, custom packages). Recently launched **Container Services** (Docker in Snowflake) for hosting models/apps.
+        - **External Data Applications**
+            - **Snowflake:** Strong for building **product features/web apps powered by live queries** due to fast data warehousing performance (e.g., Select's product).
+            - **Databricks:** Technically possible with serverless SQL, but not yet a common use case.
+        - **Marketplace**
+            - **Snowflake:** Earlier focus on **data sharing** and a marketplace for datasets and **Snowflake Native Apps** (app store for third-party apps within Snowflake).
+            - **Databricks:** Marketplace exists for data sets; **technology partner integrations are emerging** for large players.
+        - **Data Governance**
+            - **Snowflake:** Strong **system tables** (Account Usage) for metadata, cost management suite, and **Snowflake Horizon** (governance, security).
+            - **Databricks:** **Unity Catalog** for unifying governance, lineage, and improving cost breakdowns.
+    - **Cost and Pricing**
+        - Both platforms **can get expensive** if not managed properly.
+        - **Databricks "9x cheaper" claim is misleading**. It often doesn't factor in **human cost** of tuning and excludes underlying cloud compute costs (only shows DBUs).
+        - **Databricks can potentially run specific workloads cheaper from a pure compute standpoint** due to many tuning levers (e.g., spot instances).
+        - However, the **total cost of ownership (TCO) might be comparable or higher** on Databricks due to time spent on tuning (e.g., Spark out-of-memory errors). Companies like Sync help automate tuning to reduce this human cost.
+    - **Strategic Considerations**
+        - **Ease of Use:**
+            - **Snowflake:** Generally seen as **easier to use**, more opinionated, with fewer choices for doing things.
+            - **Databricks:** Offers many options, can be complex but provides more knobs for tuning.
+        - **Why Companies Use Both Platforms**
+            - **Prevent Vendor Lock-in:** Large enterprises use both to gain leverage in contract negotiations.
+            - **Historical Strengths:** Historically, companies bought Snowflake for BI/SQL and Databricks for ML. This reason may diminish as platforms converge.
+        - **Choosing a Platform Today**
+            - Depends on **team expertise** and **top business needs**.
+            - If primary value is from **"counting things"** (BI, reporting), **Snowflake** offers ease of use and time-to-value.
+            - If the team has strong engineers and prefers **heavy Python/ML experiences**, **Databricks** might be a better fit.
+            - Ultimately, **neither platform is a bad choice** as they are both excellent and converging in functionality.
+    - **Notable Acquisitions**
+        - **Databricks:**
+            - **Redash** (2020): Significant for first-party dashboarding.
+            - **MosaicML:** A "massive," "aggressive," and **"forward-looking bet"** in the LLM/AI space.
+        - **Snowflake:**
+            - **Streamlit:** Important for enabling Python-based data applications.
+    - **Biggest Threats (Other than Each Other)**
+        - **Microsoft Fabric:** An emerging threat, particularly for Databricks customers on Azure, as it's backed by Microsoft and also uses Spark.
+    - **Conclusion**
+        - Both platforms are **converging on similar functionalities**.
+        - They still have some lingering historical strengths and weaknesses.
+        - Both are **excellent products**.
+        - Decision should be based on **company needs and research**, not just this webinar.
