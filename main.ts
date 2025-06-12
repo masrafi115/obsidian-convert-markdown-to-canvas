@@ -37,7 +37,7 @@ interface CanvasNode {
 
 // Represents a connection between two nodes on the canvas
 interface CanvasEdge {
-	id:string;
+	id: string;
 	fromNode: string;
 	fromSide: 'left' | 'right' | 'top' | 'bottom';
 	toNode: string;
@@ -100,7 +100,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 				}
 			})
 		);
-		
+
 		this.addSettingTab(new MarkdownToCanvasSettingTab(this.app, this));
 	}
 
@@ -115,7 +115,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-	
+
 	/**
 	 * Parses the markdown content into a tree of nodes.
 	 * @param content - The markdown string to parse.
@@ -126,34 +126,29 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 		const parentStack: ParsedNode[] = [];
 		const imageRegex = /!\[\[([^\]]+)\]\]/; // Extracts the image name
 
-		// Use split(/\r?\n/) to handle Windows line endings
 		const lines = content.split(/\r?\n/);
-		
+
 		console.log("--- MD to Canvas: Begin Parsing ---");
 
 		for (const line of lines) {
-			// FIX: Replace non-breaking spaces (\u00A0) with regular spaces
 			const cleanedLine = line.replace(/\u00A0/g, ' ');
 
 			if (cleanedLine.trim() === '') continue;
 
-			// FIX: Normalize indentation by replacing tabs with 2 spaces to handle both cases
 			const normalizedLine = cleanedLine.replace(/\t/g, '  ');
 
 			const indentMatch = normalizedLine.match(/^\s*/);
 			const indentation = indentMatch ? indentMatch[0].length : 0;
 			const level = Math.floor(indentation / 2);
 
-			// --- LOGGING ---
 			console.log(`Line: "${line}"`);
 			console.log(`Indentation: ${indentation}, Level: ${level}, Parent Stack Size: ${parentStack.length}`);
-			
+
 			if (level >= maxDepth) {
 				console.log("-> Skipping due to max depth.");
 				continue;
 			}
-			
-			// Use the normalized line for text extraction to be consistent
+
 			const text = normalizedLine.trim().replace(/^-\s*/, '');
 			const imageMatch = text.match(imageRegex);
 
@@ -165,8 +160,11 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 				children: [],
 			};
 
-			// Adjust parent stack based on current indentation level
-			while (parentStack.length > level) {
+			// --- BUG FIX ---
+			// The original logic `while (parentStack.length > level)` was unreliable.
+			// This new logic correctly finds the parent by comparing the current node's level
+			// to the level of the node at the top of the stack.
+			while (parentStack.length > 0 && parentStack[parentStack.length - 1].level >= level) {
 				parentStack.pop();
 			}
 
@@ -183,7 +181,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 
 			parentStack.push(node);
 		}
-		
+
 		console.log("--- MD to Canvas: Parsing Finished ---");
 		return rootNodes;
 	}
@@ -238,8 +236,8 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 			} else { // vertical
 				childY = y + nodeHeight + V_SPACING;
 			}
-			
-			for(const child of node.children) {
+
+			for (const child of node.children) {
 				const childSize = processNode(child, childX, childY);
 				if (layout === 'horizontal') {
 					childY += childSize.height + V_SPACING;
@@ -252,7 +250,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 				}
 			}
 
-			if(layout === 'horizontal') {
+			if (layout === 'horizontal') {
 				subtreeHeight -= V_SPACING; // Remove last spacing
 				return { width: nodeWidth + H_SPACING + subtreeWidth, height: Math.max(nodeHeight, subtreeHeight) };
 			} else {
@@ -265,7 +263,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 			const treeSize = processNode(root, 0, currentY);
 			currentY += treeSize.height + V_SPACING * 2;
 		}
-		
+
 		return { nodes: finalNodes, edges: finalEdges };
 	}
 
@@ -277,7 +275,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 
 		const parentPath = sourceFile.parent instanceof TFolder && sourceFile.parent.path === '/' ? '' : sourceFile.parent.path;
 		const newFilePath = `${parentPath}/${newFileName}.canvas`;
-		
+
 		const fileExists = await this.app.vault.adapter.exists(newFilePath);
 		if (fileExists) {
 			new Notice(`Error: File "${newFileName}.canvas" already exists.`);
@@ -295,7 +293,7 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 			}
 
 			const { nodes, edges } = this.calculateLayout(parsedRootNodes, layout);
-			
+
 			const canvasData = { nodes, edges };
 
 			const newFile = await this.app.vault.create(newFilePath, JSON.stringify(canvasData, null, 2));
@@ -314,7 +312,7 @@ class ConversionModal extends Modal {
 	result: ConversionModalResult;
 	onSubmit: (result: ConversionModalResult) => void;
 	sourceFile: TFile;
-	
+
 	constructor(app: App, sourceFile: TFile, onSubmit: (result: ConversionModalResult) => void) {
 		super(app);
 		this.sourceFile = sourceFile;
@@ -338,7 +336,7 @@ class ConversionModal extends Modal {
 					.setValue(this.result.fileName)
 					.onChange((value) => this.result.fileName = value)
 			);
-			
+
 		new Setting(contentEl)
 			.setName('Layout direction')
 			.addDropdown(dropdown => {
