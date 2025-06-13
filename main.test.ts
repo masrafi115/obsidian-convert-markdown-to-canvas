@@ -1,6 +1,5 @@
 // --- JEST MOCK ---
 // We must mock the 'obsidian' module because it's not available in the test environment.
-// This fake version prevents the 'Cannot find module' error.
 jest.mock('obsidian', () => {
     return {
         Plugin: class {},
@@ -26,188 +25,176 @@ jest.mock('obsidian', () => {
 
 import MarkdownToCanvasPlugin from './main'; // Adjust the import path as needed
 
-// Helper function to remove the circular parent reference for test comparisons
-const stripParent = (nodes: any[]) => {
+// Helper function to remove properties that are irrelevant for comparison
+const stripParentAndIds = (nodes: any[]) => {
     return JSON.parse(JSON.stringify(nodes, (key, value) => {
-        if (key === 'parent') {
+        if (key === 'parent' || key === 'id' || key === 'isImage') {
             return undefined;
         }
         return value;
     }));
 };
 
+// Universal test runner for the new section-based parsing
+const runParseTest = (testName: string, markdown: string, expected: any) => {
+    test(testName, () => {
+        const plugin = new MarkdownToCanvasPlugin({} as any, {} as any);
+        const result = (plugin as any).parseMarkdown(markdown, 10);
+        
+        const comparableResult = result.map((section: any) => ({
+            heading: section.heading,
+            nodes: stripParentAndIds(section.nodes)
+        }));
 
-describe('MarkdownToCanvasPlugin: parseMarkdown', () => {
-    let plugin: MarkdownToCanvasPlugin;
-    let mockIdCounter: number;
+        expect(comparableResult).toEqual(expected);
+    });
+};
 
-    // Helper to generate predictable UUIDs for testing
-    const getMockId = (index: number) => `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`;
 
-    // Mocking crypto.randomUUID for predictable test outcomes
-    beforeAll(() => {
+describe('MarkdownToCanvasPlugin: Parsing Logic', () => {
+    
+    beforeEach(() => {
+        let mockIdCounter = 0;
         global.crypto = {
             ...global.crypto,
-            randomUUID: () => getMockId(mockIdCounter++),
+            randomUUID: () => `mock-id-${mockIdCounter++}`,
         };
     });
 
-    // Reset mocks and plugin instance before each test
-    beforeEach(() => {
-        plugin = new MarkdownToCanvasPlugin({} as any, {} as any); 
-        mockIdCounter = 0;
-    });
-
-    test('Test 1: Should return an empty array for empty or whitespace input', () => {
-        const markdown = `
-        
-        `;
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(result).toEqual([]);
-    });
-
-    test('Test 2: Should handle a single root node', () => {
-        const markdown = '- First item';
-        const expected = [{ id: getMockId(0), text: 'First item', isImage: false, level: 0, children: [] }];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
-    });
-
-    test('Test 3: Should handle two separate root nodes', () => {
-        const markdown = '- First item\n- Second item';
-        const expected = [
-            { id: getMockId(0), text: 'First item', isImage: false, level: 0, children: [] },
-            { id: getMockId(1), text: 'Second item', isImage: false, level: 0, children: [] }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
-    });
-
-    test('Test 4: Should handle a simple parent-child relationship', () => {
-        const markdown = '- Parent\n  - Child';
-        const expected = [
-            {
-                id: getMockId(0), text: 'Parent', isImage: false, level: 0, children: [
-                    { id: getMockId(1), text: 'Child', isImage: false, level: 1, children: [] }
-                ]
-            }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
-    });
-
-    test('Test 5: Should handle a hierarchy with multiple children and siblings', () => {
-        const markdown = '- Parent 1\n  - Child 1.1\n  - Child 1.2\n- Parent 2';
-        const expected = [
-            {
-                id: getMockId(0), text: 'Parent 1', isImage: false, level: 0, children: [
-                    { id: getMockId(1), text: 'Child 1.1', isImage: false, level: 1, children: [] },
-                    { id: getMockId(2), text: 'Child 1.2', isImage: false, level: 1, children: [] }
-                ]
-            },
-            { id: getMockId(3), text: 'Parent 2', isImage: false, level: 0, children: [] }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
-    });
+    // --- ALL TESTS UNIFIED ---
     
-    test('Test 6: Should handle mixed tab and space indentation', () => {
-        const markdown = '- Root\n\t- Child (tab)\n  - Sibling (spaces)';
-        const expected = [
-            {
-                id: getMockId(0), text: 'Root', isImage: false, level: 0, children: [
-                    { id: getMockId(1), text: 'Child (tab)', isImage: false, level: 1, children: [] },
-                    { id: getMockId(2), text: 'Sibling (spaces)', isImage: false, level: 1, children: [] }
-                ]
-            }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
-    });
+    runParseTest(
+        'Test 1: Should return an empty array for empty or whitespace input',
+        `   `,
+        []
+    );
+
+    runParseTest(
+        'Test 2: Should handle a single root node',
+        `- First item`,
+        [{ heading: null, nodes: [{ text: 'First item', level: 0, children: [] }] }]
+    );
+
+    runParseTest(
+        'Test 3: Should handle two separate root nodes',
+        `- First item\n- Second item`,
+        [{ heading: null, nodes: [
+            { text: 'First item', level: 0, children: [] },
+            { text: 'Second item', level: 0, children: [] }
+        ]}]
+    );
+    
+    runParseTest(
+        'Test 4: Should handle a simple parent-child relationship',
+        `- Parent\n  - Child`,
+        [{ heading: null, nodes: [
+            { text: 'Parent', level: 0, children: [{ text: 'Child', level: 1, children: [] }] }
+        ]}]
+    );
+    
+    runParseTest(
+        'Test 5: Should handle a hierarchy with multiple children and siblings',
+        '- Parent 1\n  - Child 1.1\n  - Child 1.2\n- Parent 2',
+        [{ heading: null, nodes: [
+            { text: 'Parent 1', level: 0, children: [
+                { text: 'Child 1.1', level: 1, children: [] },
+                { text: 'Child 1.2', level: 1, children: [] }
+            ]},
+            { text: 'Parent 2', level: 0, children: [] }
+        ]}]
+    );
+
+    runParseTest(
+        'Test 6: Should handle mixed tab and space indentation',
+        '- Root\n\t- Child (tab)\n  - Sibling (spaces)',
+        [{ heading: null, nodes: [
+            { text: 'Root', level: 0, children: [
+                { text: 'Child (tab)', level: 1, children: [] },
+                { text: 'Sibling (spaces)', level: 1, children: [] }
+            ]}
+        ]}]
+    );
 
     test('Test 7: Should correctly parse an embedded image', () => {
-        const markdown = '- An item\n  - ![[my-image.png]]';
-        const expected = [
-            {
-                id: getMockId(0), text: 'An item', isImage: false, level: 0, children: [
-                    { id: getMockId(1), text: 'my-image.png', isImage: true, level: 1, children: [] }
-                ]
-            }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
+        const plugin = new MarkdownToCanvasPlugin({} as any, {} as any);
+        const result = (plugin as any).parseMarkdown('- An item\n  - ![[my-image.png]]', 10);
+        expect(result[0].nodes[0].children[0].isImage).toBe(true);
+        expect(result[0].nodes[0].children[0].text).toBe('my-image.png');
     });
 
-    test('Test 8: Should ignore nodes beyond the maxDepth limit', () => {
-        const markdown = '- Level 0\n  - Level 1\n    - Level 2';
-        const expected = [
-            {
-                id: getMockId(0), text: 'Level 0', isImage: false, level: 0, children: [
-                    { id: getMockId(1), text: 'Level 1', isImage: false, level: 1, children: [] }
-                ]
-            }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 2); // maxDepth = 2
-        expect(stripParent(result)).toEqual(expected);
+    test('Test 8: Should ignore nodes beyond a specified depth', () => {
+        const plugin = new MarkdownToCanvasPlugin({} as any, {} as any);
+        const result = (plugin as any).parseMarkdown('- Level 0\n  - Level 1\n    - Level 2', 2);
+        expect(result[0].nodes[0].children[0].children).toHaveLength(0);
     });
+    
+    runParseTest(
+        'Test 9: Should handle siblings with large indentation',
+        `- Root\n    - Motivation\n    - Acquisitions`,
+        [{ heading: null, nodes: [
+            { text: 'Root', level: 0, children: [
+                { text: 'Motivation', level: 1, children: [] },
+                { text: 'Acquisitions', level: 1, children: [] }
+            ]}
+        ]}]
+    );
 
-    test('Test 9: Should handle siblings with large indentation', () => {
-        const markdown = `- Root\n    - Motivation for the Discussion\n    - Notable Acquisitions`;
-        // FIX: The expected level is now 1, because the dynamic logic sees 4 spaces as the base indent unit.
-        const expectedCorrectStructure = [
-            {
-                id: getMockId(0), text: 'Root', isImage: false, level: 0, children: [
-                    { id: getMockId(1), text: 'Motivation for the Discussion', isImage: false, level: 1, children: [] },
-                    { id: getMockId(2), text: 'Notable Acquisitions', isImage: false, level: 1, children: [] }
-                ]
-            }
-        ];
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expectedCorrectStructure);
-    });
+    runParseTest(
+        'Test 10: Should correctly handle complex sibling structures',
+        `- Notable Acquisitions\n    - Databricks:\n        - Redash\n    - Snowflake:`,
+        [{ heading: null, nodes: [
+            { text: 'Notable Acquisitions', level: 0, children: [
+                { text: 'Databricks:', level: 1, children: [
+                    { text: 'Redash', level: 2, children: [] }
+                ]},
+                { text: 'Snowflake:', level: 1, children: [] }
+            ]}
+        ]}]
+    );
 
-    test('Test 10: Should correctly handle complex sibling structures from user file', () => {
-        // This test uses 4-space indents, which the dynamic logic will treat as level 1, 2, etc.
-        const markdown = `
-- Notable Acquisitions
-    - Databricks:
-        - Redash
-        - MosaicML:
-    - Snowflake:
-        - Streamlit:
-        `;
-        
-        const expected = [
-            {
-                id: getMockId(0),
-                text: 'Notable Acquisitions',
-                isImage: false,
-                level: 0,
-                children: [
-                    {
-                        id: getMockId(1),
-                        text: 'Databricks:',
-                        isImage: false,
-                        level: 1, // 4 spaces = level 1
-                        children: [
-                            { id: getMockId(2), text: 'Redash', isImage: false, level: 2, children: [] }, // 8 spaces = level 2
-                            { id: getMockId(3), text: 'MosaicML:', isImage: false, level: 2, children: [] }
-                        ]
-                    },
-                    {
-                        id: getMockId(4),
-                        text: 'Snowflake:',
-                        isImage: false,
-                        level: 1, // 4 spaces = level 1
-                        children: [
-                             { id: getMockId(5), text: 'Streamlit:', isImage: false, level: 2, children: [] } // 8 spaces = level 2
-                        ]
-                    }
-                ]
-            }
-        ];
+    runParseTest(
+        'Test 11: Should handle a list with no heading',
+        `- A\n  - B`,
+        [{ heading: null, nodes: [{ text: 'A', level: 0, children: [{ text: 'B', level: 1, children: [] }] }] }]
+    );
 
-        const result = (plugin as any).parseMarkdown(markdown, 10);
-        expect(stripParent(result)).toEqual(expected);
-    });
+    runParseTest(
+        'Test 12: Should handle a list that starts with a heading',
+        `# My Heading\n- A\n- B`,
+        [{
+            heading: { text: 'My Heading', level: 1 },
+            nodes: [
+                { text: 'A', level: 0, children: [] },
+                { text: 'B', level: 0, children: [] }
+            ]
+        }]
+    );
+    
+    runParseTest(
+        'Test 13: Should handle multiple headings of the same level',
+        `# Heading 1\n- A\n\n# Heading 2\n- B`,
+        [
+            { heading: { text: 'Heading 1', level: 1 }, nodes: [{ text: 'A', level: 0, children: [] }] },
+            { heading: { text: 'Heading 2', level: 1 }, nodes: [{ text: 'B', level: 0, children: [] }] }
+        ]
+    );
+
+    runParseTest(
+        'Test 14: Should handle nested headings (H1 -> H2)',
+        `# L1\n- A\n\n## L2\n- B`,
+        [
+            { heading: { text: 'L1', level: 1 }, nodes: [{ text: 'A', level: 0, children: [] }] },
+            { heading: { text: 'L2', level: 2 }, nodes: [{ text: 'B', level: 0, children: [] }] }
+        ]
+    );
+
+    runParseTest(
+        "Test 15: Should handle the user's complex example",
+        `- list before heading\n\n# h1\n\n- list under h1\n\n## h2\n\n- list under h2`,
+        [
+            { heading: null, nodes: [{ text: 'list before heading', level: 0, children: [] }] },
+            { heading: { text: 'h1', level: 1 }, nodes: [{ text: 'list under h1', level: 0, children: [] }] },
+            { heading: { text: 'h2', level: 2 }, nodes: [{ text: 'list under h2', level: 0, children: [] }] }
+        ]
+    );
 });

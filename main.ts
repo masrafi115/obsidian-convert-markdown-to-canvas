@@ -22,15 +22,21 @@ interface ParsedNode {
     parent?: ParsedNode;
 }
 
+interface CanvasSection {
+    heading: { text: string; level: number } | null;
+    nodes: ParsedNode[];
+}
+
 interface CanvasNode {
     id: string;
     x: number;
     y: number;
     width: number;
     height: number;
-    type: 'text' | 'file';
+    type: 'text' | 'file' | 'group';
     text?: string;
     file?: string;
+    label?: string; // For groups
 }
 
 interface CanvasEdge {
@@ -58,7 +64,10 @@ const IMG_WIDTH = 300;
 const IMG_HEIGHT = 300;
 const H_SPACING = 100;
 const V_SPACING = 50;
-const TAB_REPLACEMENT = '  '; // Define that a tab will be treated as 2 spaces
+const GROUP_PADDING = 100;
+const GROUP_HEADER_HEIGHT = 50;
+const SECTION_SPACING = 100;
+const TAB_REPLACEMENT = '  ';
 
 export default class MarkdownToCanvasPlugin extends Plugin {
     settings: MarkdownToCanvasSettings;
@@ -114,7 +123,39 @@ export default class MarkdownToCanvasPlugin extends Plugin {
         await this.saveData(this.settings);
     }
     
-    private parseMarkdown(content: string, maxDepth: number): ParsedNode[] {
+    // Main parsing function, made public for testing.
+    public parseMarkdown(content: string, maxDepth: number): CanvasSection[] {
+        const sections: CanvasSection[] = [{ heading: null, nodes: [] }];
+        let listContentForCurrentSection = '';
+
+        const lines = content.split(/\r?\n/);
+        const headingRegex = /^(#+)\s+(.*)/;
+
+        const processListContent = () => {
+            if (listContentForCurrentSection.trim() !== '') {
+                sections[sections.length - 1].nodes = this._parseListContent(listContentForCurrentSection, maxDepth);
+            }
+            listContentForCurrentSection = '';
+        };
+
+        for (const line of lines) {
+            const headingMatch = line.trim().match(headingRegex);
+            if (headingMatch) {
+                processListContent();
+                sections.push({
+                    heading: { text: headingMatch[2].trim(), level: headingMatch[1].length },
+                    nodes: []
+                });
+            } else {
+                listContentForCurrentSection += line + '\n';
+            }
+        }
+        processListContent();
+
+        return sections.filter(s => s.heading !== null || s.nodes.length > 0);
+    }
+    
+    private _parseListContent(content: string, maxDepth: number): ParsedNode[] {
         const rootNodes: ParsedNode[] = [];
         const parentStack: ParsedNode[] = [];
         const imageRegex = /!\[\[([^\]]+)\]\]/;
@@ -123,20 +164,14 @@ export default class MarkdownToCanvasPlugin extends Plugin {
         const lines = content.split(/\r?\n/);
 
         for (const line of lines) {
-            // Skip empty lines or lines that aren't list items
-            if (line.trim() === '' || !line.trim().startsWith('-')) {
-                continue;
-            }
+            if (line.trim() === '' || !line.trim().startsWith('-')) continue;
 
             const indentMatch = line.match(/^\s*/);
             const rawIndent = indentMatch ? indentMatch[0] : '';
-            
             const normalizedIndent = rawIndent.replace(/\t/g, TAB_REPLACEMENT);
             const indentation = normalizedIndent.length;
 
-            if (indentUnit === null && indentation > 0) {
-                indentUnit = indentation;
-            }
+            if (indentUnit === null && indentation > 0) indentUnit = indentation;
             
             const level = indentUnit ? Math.round(indentation / indentUnit) : 0;
             
@@ -165,17 +200,64 @@ export default class MarkdownToCanvasPlugin extends Plugin {
             } else {
                 rootNodes.push(node);
             }
-
             parentStack.push(node);
         }
         return rootNodes;
     }
 
-    private calculateLayout(rootNodes: ParsedNode[], layout: 'horizontal' | 'vertical'): { nodes: CanvasNode[], edges: CanvasEdge[] } {
-        const nodes: CanvasNode[] = [];
-        const edges: CanvasEdge[] = [];
+    private calculateLayout(sections: CanvasSection[], layout: 'horizontal' | 'vertical'): { nodes: CanvasNode[], edges: CanvasEdge[] } {
+        const finalNodes: CanvasNode[] = [];
+        const finalEdges: CanvasEdge[] = [];
         let cursorX = 0;
         let cursorY = 0;
+
+        for (const section of sections) {
+            if (section.nodes.length === 0) continue;
+
+            const groupX = cursorX;
+            const groupY = cursorY;
+
+            const { nodes: sectionNodes, edges: sectionEdges, width, height } = this._calculateSectionLayout(section.nodes, layout, groupX, groupY);
+            
+            if (section.heading) {
+                const groupWidth = width + GROUP_PADDING;
+                const groupHeight = height + GROUP_PADDING + GROUP_HEADER_HEIGHT;
+                
+                finalNodes.push({
+                    id: crypto.randomUUID(),
+                    type: 'group',
+                    x: groupX - (GROUP_PADDING / 2),
+                    y: groupY - (GROUP_PADDING / 2),
+                    width: groupWidth,
+                    height: groupHeight,
+                    label: section.heading.text
+                });
+
+                sectionNodes.forEach(n => {
+                    n.y += (GROUP_PADDING / 2);
+                    n.x += (GROUP_PADDING / 2);
+                });
+                
+                finalNodes.push(...sectionNodes);
+                cursorY += groupHeight + SECTION_SPACING;
+
+            } else {
+                 finalNodes.push(...sectionNodes);
+                 cursorY += height + SECTION_SPACING;
+            }
+            
+            finalEdges.push(...sectionEdges);
+        }
+
+        return { nodes: finalNodes, edges: finalEdges };
+    }
+    
+    private _calculateSectionLayout(rootNodes: ParsedNode[], layout: 'horizontal' | 'vertical', startX: number, startY: number): { nodes: CanvasNode[], edges: CanvasEdge[], width: number, height: number } {
+        const nodes: CanvasNode[] = [];
+        const edges: CanvasEdge[] = [];
+        let totalWidth = 0;
+        let totalHeight = 0;
+        let currentY = startY;
 
         const placeNodes = (node: ParsedNode, x: number, y: number): { width: number; height: number } => {
             const isImage = node.isImage;
@@ -200,46 +282,38 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 
             let childrenWidth = 0;
             let childrenHeight = 0;
-            let childX = layout === 'horizontal' ? x + nodeWidth + H_SPACING : x;
-            let childY = layout === 'horizontal' ? y : y + nodeHeight + V_SPACING;
+            let childX = x + nodeWidth + H_SPACING;
+            let childY = y;
 
             for (const child of node.children) {
                 const childDimensions = placeNodes(child, childX, childY);
-                if (layout === 'horizontal') {
-                    childY += childDimensions.height + V_SPACING;
-                    childrenWidth = Math.max(childrenWidth, childDimensions.width);
-                    childrenHeight += childDimensions.height + V_SPACING;
-                } else { // vertical
-                    childX += childDimensions.width + H_SPACING;
-                    childrenHeight = Math.max(childrenHeight, childDimensions.height);
-                    childrenWidth += childDimensions.width + H_SPACING;
-                }
+                childY += childDimensions.height + V_SPACING;
+                childrenWidth = Math.max(childrenWidth, childDimensions.width);
+                childrenHeight += childDimensions.height + V_SPACING;
             }
             
             if (node.children.length > 0) {
-                 if (layout === 'horizontal') {
-                    childrenHeight -= V_SPACING;
-                } else {
-                    childrenWidth -= H_SPACING;
-                }
+                 childrenHeight -= V_SPACING;
             }
 
-            const totalWidth = layout === 'horizontal' ? nodeWidth + H_SPACING + childrenWidth : Math.max(nodeWidth, childrenWidth);
-            const totalHeight = layout === 'horizontal' ? Math.max(nodeHeight, childrenHeight) : nodeHeight + V_SPACING + childrenHeight;
+            const selfWidth = nodeWidth + (childrenWidth > 0 ? H_SPACING + childrenWidth : 0);
+            const selfHeight = Math.max(nodeHeight, childrenHeight);
             
-            return { width: totalWidth, height: totalHeight };
+            return { width: selfWidth, height: selfHeight };
         };
 
         for (const root of rootNodes) {
-            if (layout === 'horizontal') {
-                const dimensions = placeNodes(root, cursorX, cursorY);
-                cursorY += dimensions.height + V_SPACING * 2;
-            } else { // vertical
-                const dimensions = placeNodes(root, cursorX, cursorY);
-                cursorX += dimensions.width + H_SPACING * 2;
-            }
+            const dimensions = placeNodes(root, startX, currentY);
+            currentY += dimensions.height + V_SPACING;
+            totalWidth = Math.max(totalWidth, dimensions.width);
         }
-        return { nodes, edges };
+
+        totalHeight = currentY - startY;
+        if (rootNodes.length > 0) {
+             totalHeight -= V_SPACING;
+        }
+
+        return { nodes, edges, width: totalWidth, height: totalHeight };
     }
 
     async createCanvas(newFileName: string, sourceFile: TFile, layout: 'horizontal' | 'vertical', depth: number) {
@@ -258,14 +332,14 @@ export default class MarkdownToCanvasPlugin extends Plugin {
 
         try {
             const content = await this.app.vault.cachedRead(sourceFile);
-            const parsedRootNodes = this.parseMarkdown(content, depth);
+            const sections = this.parseMarkdown(content, depth);
 
-            if (parsedRootNodes.length === 0) {
-                new Notice("No list items found in the note to convert.");
+            if (sections.length === 0 || sections.every(s => s.nodes.length === 0)) {
+                new Notice("No list items or headings found to convert.");
                 return;
             }
-
-            const { nodes, edges } = this.calculateLayout(parsedRootNodes, layout);
+            
+            const { nodes, edges } = this.calculateLayout(sections, layout);
             const canvasData = { nodes, edges };
             const newFile = await this.app.vault.create(newFilePath, JSON.stringify(canvasData, null, 2));
             
