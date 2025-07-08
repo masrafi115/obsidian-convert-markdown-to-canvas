@@ -1,7 +1,7 @@
 {
 	"id": "markdown-to-canvas",
 	"name": "Markdown to Canvas",
-	"version": "9.0.0",
+	"version": "10.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Converts Markdown notes into Canvas mind maps.",
 	"author": "Dhruv",
