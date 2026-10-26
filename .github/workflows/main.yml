@@ -37,4 +37,4 @@ jobs:
           gh release create "$tag" \
             --title="$tag" \
             --draft \
-            dist/main.js dist/manifest.json dist/styles.css ${{ env.PLUGIN_NAME }}.zip
+            main.js manifest.json styles.css ${{ env.PLUGIN_NAME }}.zip
